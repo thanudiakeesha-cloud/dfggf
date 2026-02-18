@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 const settings = {
   prefixes: ['.', '!', '/', '#'], // Multiple prefix support you can add one or more
   packname: 'Infinity MD',
@@ -25,15 +28,44 @@ const settings = {
 };
 
 // merge overrides from data/manage.json (simple editable file used by dashboard)
-try {
-  const overridePath = path.join(__dirname, 'data', 'manage.json');
-  if (fs.existsSync(overridePath)) {
+const overridePath = path.join(__dirname, 'data', 'manage.json');
+
+function loadOverrides() {
+  try {
+    if (!fs.existsSync(overridePath)) return;
     const raw = fs.readFileSync(overridePath, 'utf8');
     const overrides = JSON.parse(raw || '{}');
     Object.assign(settings, overrides);
+    console.log('Settings overrides loaded from data/manage.json');
+  } catch (e) {
+    console.log('Failed to load manage.json overrides:', e.message);
   }
+}
+
+loadOverrides();
+
+// Watch file for changes and hot-reload overrides (debounced)
+let reloadTimer = null;
+try {
+  fs.watch(overridePath, (eventType) => {
+    if (reloadTimer) clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      console.log('Detected change in data/manage.json — reloading settings');
+      loadOverrides();
+    }, 250);
+  });
 } catch (e) {
-  console.log('Failed to load manage.json overrides:', e.message);
+  // fs.watch may throw if file doesn't exist yet; fallback to watchFile
+  try {
+    fs.watchFile(overridePath, { interval: 1000 }, (curr, prev) => {
+      if (curr.mtimeMs !== prev.mtimeMs) {
+        console.log('Detected change in data/manage.json (watchFile) — reloading settings');
+        loadOverrides();
+      }
+    });
+  } catch (err) {
+    // noop
+  }
 }
 
 module.exports = settings;
