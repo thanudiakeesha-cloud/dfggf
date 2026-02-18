@@ -119,6 +119,62 @@ function ensureSessionDirectory() {
     return sessionPath;
 }
 
+async function sendConnectedNotification(client, ghostMode) {
+    try {
+        const botNumber = client.user?.id?.split(':')[0] + '@s.whatsapp.net';
+        if (!botNumber) return;
+
+        // pick random asset if available
+        const assetsDir = path.join(__dirname, 'assets');
+        let imageBuffer = null;
+        try {
+            if (fs.existsSync(assetsDir)) {
+                const imgs = fs.readdirSync(assetsDir).filter(f => /\.(jpe?g|png|webp)$/i.test(f));
+                if (imgs.length) {
+                    const choice = imgs[Math.floor(Math.random() * imgs.length)];
+                    const full = path.join(assetsDir, choice);
+                    if (fs.existsSync(full)) imageBuffer = fs.readFileSync(full);
+                }
+            }
+        } catch (e) {
+            console.log('Connected notification image load failed:', e.message);
+        }
+
+        const ghostStatus = (ghostMode && ghostMode.enabled) ? '\n👻 Stealth Mode: ACTIVE' : '';
+        const text = `🤖 Bot Connected Successfully!\n\n⏰ Time: ${new Date().toLocaleString()}\n✅ Status: Online and Ready!${ghostStatus}\n\n${settings.connectNote || '✅Make sure to join below channel'}`;
+
+        const contextInfo = {
+            forwardingScore: settings.forwardingScore || 1,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+                newsletterName: settings.newsletterName || 'MEGA MD',
+                serverMessageId: -1
+            }
+        };
+
+        // try sending with image first (if available), fallback to text-only
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                if (imageBuffer) {
+                    await client.sendMessage(botNumber, { image: imageBuffer, caption: text, contextInfo }, { withoutPreview: false });
+                } else {
+                    await client.sendMessage(botNumber, { text, contextInfo });
+                }
+                console.log('Connected notification sent');
+                break;
+            } catch (err) {
+                console.log(`Connected notification attempt ${attempt} failed:`, err.message);
+                if (attempt === maxAttempts) throw err;
+                await delay(1000 * attempt);
+            }
+        }
+    } catch (err) {
+        printLog('error', `Failed to send connection message: ${err.message}`);
+    }
+}
+
 function hasValidSession() {
     try {
         const credsPath = path.join(__dirname, 'session', 'creds.json');
@@ -477,21 +533,7 @@ async function startQasimDev() {
                 console.log(chalk.yellow(`🌿Connected to => ` + JSON.stringify(QasimDev.user, null, 2)));
 
                 try {
-                    const botNumber = QasimDev.user.id.split(':')[0] + '@s.whatsapp.net';
-                    const ghostStatus = (ghostMode && ghostMode.enabled) ? '\n👻 Stealth Mode: ACTIVE' : '';
-                    
-                    await QasimDev.sendMessage(botNumber, {
-                        text: `🤖 Bot Connected Successfully!\n\n⏰ Time: ${new Date().toLocaleString()}\n✅ Status: Online and Ready!${ghostStatus}\n\n✅Make sure to join below channel`,
-                        contextInfo: {
-                            forwardingScore: 1,
-                            isForwarded: true,
-                            forwardedNewsletterMessageInfo: {
-                                newsletterJid: '120363319098372999@newsletter',
-                                newsletterName: 'MEGA MD',
-                                serverMessageId: -1
-                            }
-                        }
-                    });
+                    await sendConnectedNotification(QasimDev, ghostMode);
                 } catch (error) {
                     printLog('error', `Failed to send connection message: ${error.message}`);
                 }
