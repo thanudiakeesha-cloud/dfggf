@@ -1,6 +1,19 @@
 const commandHandler = require('../lib/commandHandler');
 const settings = require('../settings');
 const fs = require('fs');
+const path = require('path');
+
+function pickRandomAsset() {
+  const assetsDir = path.join(__dirname, '../assets');
+  try {
+    const files = fs.readdirSync(assetsDir).filter(f => /\.(jpe?g|png|webp)$/i.test(f));
+    if (!files || files.length === 0) return null;
+    const choice = files[Math.floor(Math.random() * files.length)];
+    return path.join(assetsDir, choice);
+  } catch (e) {
+    return null;
+  }
+}
 
 module.exports = {
     command: 'allmenu',
@@ -30,10 +43,16 @@ module.exports = {
         
         menuText += `> 💫 *INFINITY MD BOT* - Powered by AI`;
 
-        const banner = './assets/unnamed_(2)_1769953519419.jpg';
-        await sock.sendMessage(chatId, {
-            image: fs.readFileSync(banner),
-            caption: menuText
-        }, { quoted: message });
+        const bannerPath = pickRandomAsset();
+        if (bannerPath && fs.existsSync(bannerPath)) {
+            await sock.sendMessage(chatId, {
+                image: fs.readFileSync(bannerPath),
+                caption: menuText
+            }, { quoted: message });
+        } else {
+            await sock.sendMessage(chatId, {
+                text: menuText
+            }, { quoted: message });
+        }
     }
 };

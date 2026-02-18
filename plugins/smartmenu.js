@@ -7,11 +7,19 @@ const os = require('os');
 function pickRandomAsset() {
   const assetsDir = path.join(__dirname, '../assets');
   try {
+    if (!fs.existsSync(assetsDir)) {
+      console.log('Assets dir does not exist:', assetsDir);
+      return null;
+    }
     const files = fs.readdirSync(assetsDir).filter(f => /\.(jpe?g|png|webp)$/i.test(f));
-    if (!files || files.length === 0) return null;
+    if (!files || files.length === 0) {
+      console.log('No image files found in:', assetsDir);
+      return null;
+    }
     const choice = files[Math.floor(Math.random() * files.length)];
     return path.join(assetsDir, choice);
   } catch (e) {
+    console.log('Error in pickRandomAsset:', e.message);
     return null;
   }
 }
@@ -56,6 +64,9 @@ module.exports = {
     try {
       const imagePath = pickRandomAsset();
       const thumbnail = imagePath && fs.existsSync(imagePath) ? fs.readFileSync(imagePath) : null;
+      console.log('Menu Debug - imagePath:', imagePath);
+      console.log('Menu Debug - thumbnail exists:', !!thumbnail);
+      console.log('Menu Debug - thumbnail size:', thumbnail ? thumbnail.length : 0);
 
       const commandCount = CommandHandler.commands.size;
       const prefix = settings.prefixes ? settings.prefixes[0] : '.';
@@ -80,11 +91,13 @@ module.exports = {
         `💫 INFINITY MD - Powered by AI`;
 
       if (thumbnail) {
+        console.log('Sending menu with image, size:', thumbnail.length);
         await sock.sendMessage(chatId, {
           image: thumbnail,
           caption: menuText
         }, { quoted: message });
       } else {
+        console.log('Sending menu as text only');
         await sock.sendMessage(chatId, {
           text: menuText
         }, { quoted: message });
