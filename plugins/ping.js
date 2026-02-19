@@ -4,7 +4,6 @@ const dns = require('dns');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const axios = require('axios');
 
 function pickRandomAsset() {
   const assetsDir = path.join(__dirname, '../assets');
